@@ -62,6 +62,7 @@ function updateUIForAuthState(isLoggedIn) {
         signupBtn.style.display = 'inline-block';
         logoutBtn.style.display = 'none';
         userInfo.style.display = 'none';
+        userEmail.textContent = ''; // Clear the email text
         guestBadge.style.display = 'inline-block';
         syncStatus.style.display = 'none';
         guestModeFooter.style.display = 'block';
@@ -112,6 +113,10 @@ async function handleLogout() {
     
     currentUser = null;
     updateUIForAuthState(false);
+    
+    // Clear the search input
+    const searchInput = document.getElementById('searchInput');
+    if (searchInput) searchInput.value = '';
     
     // Refresh to show local data only
     await renderWordsList();
@@ -763,7 +768,14 @@ document.getElementById('searchInput').addEventListener('input', (e) => {
 let currentEditId = null;
 
 async function handleEdit(e) {
+    e.stopPropagation(); // Prevent event bubbling
     const id = parseInt(e.currentTarget.dataset.id);
+    
+    if (!id || isNaN(id)) {
+        console.error('Invalid ID for edit');
+        return;
+    }
+    
     currentEditId = id;
     
     const transaction = db.transaction([STORE_NAME], 'readonly');
@@ -772,6 +784,10 @@ async function handleEdit(e) {
     
     request.onsuccess = () => {
         const word = request.result;
+        if (!word) {
+            console.error('Word not found');
+            return;
+        }
         document.getElementById('editWord').value = word.word;
         document.getElementById('editDescription').value = word.description;
         
@@ -812,13 +828,22 @@ document.getElementById('updateBtn').addEventListener('click', async () => {
 });
 
 async function handleDelete(e) {
+    e.stopPropagation(); // Prevent event bubbling
     const id = parseInt(e.currentTarget.dataset.id);
+    
+    if (!id || isNaN(id)) {
+        console.error('Invalid ID for delete');
+        return;
+    }
     
     // Get the word details to show in the modal
     const words = await getAllWords();
     const word = words.find(w => w.id === id);
     
-    if (!word) return;
+    if (!word) {
+        console.error('Word not found for deletion');
+        return;
+    }
     
     // Set the word name in the modal
     document.getElementById('deleteWordName').textContent = word.word;
@@ -846,13 +871,71 @@ document.getElementById('confirmDeleteBtn').addEventListener('click', async func
     }
     
     try {
-        // Delete from local database first
+        // FIRST: Get word details before deleting locally
+        const wordToDelete = await new Promise((resolve, reject) => {
+            const transaction = db.transaction([STORE_NAME], 'readonly');
+            const store = transaction.objectStore(STORE_NAME);
+            const request = store.get(id);
+            request.onsuccess = () => resolve(request.result);
+            request.onerror = () => reject(request.error);
+        });
+        
+        if (!wordToDelete) {
+            console.error('Word not found in IndexedDB');
+            return;
+        }
+        
+        console.log('Word to delete:', wordToDelete);
+        
+        // Delete from local database
         await deleteWord(id);
         console.log('Word deleted from IndexedDB:', id);
         
-        // Then sync deletion to cloud
-        await deleteWordFromCloud(id);
-        console.log('Word deletion synced to cloud');
+        // Then sync deletion to cloud using the word details we got
+        if (supabaseClient && isOnline && currentUser) {
+            try {
+                updateSyncStatus('syncing');
+                
+                let deleted = false;
+                
+                if (wordToDelete.cloudId) {
+                    // Delete by cloud ID
+                    const { error } = await supabaseClient
+                        .from('words')
+                        .delete()
+                        .eq('id', wordToDelete.cloudId)
+                        .eq('user_id', currentUser.id);
+                    
+                    if (!error) {
+                        deleted = true;
+                        console.log('Deleted from cloud by cloudId:', wordToDelete.cloudId);
+                    } else {
+                        console.error('Delete by cloudId error:', error);
+                    }
+                }
+                
+                // If no cloudId or delete failed, try matching by word and description
+                if (!deleted) {
+                    const { error } = await supabaseClient
+                        .from('words')
+                        .delete()
+                        .eq('user_id', currentUser.id)
+                        .eq('word', wordToDelete.word)
+                        .eq('description', wordToDelete.description);
+                    
+                    if (!error) {
+                        console.log('Deleted from cloud by matching:', wordToDelete.word);
+                    } else {
+                        console.error('Delete by match error:', error);
+                    }
+                }
+                
+                updateSyncStatus('synced');
+            } catch (error) {
+                console.error('Cloud deletion error:', error);
+                updateSyncStatus('error');
+            }
+        }
         
         // Refresh the list
         await renderWordsList();
@@ -930,6 +1013,10 @@ initDB().then(async () => {
             await pullFromCloud();
         }
     }
+    
+    // Clear search input on page load (in case browser autofilled it)
+    const searchInput = document.getElementById('searchInput');
+    if (searchInput) searchInput.value = '';
     
     renderWordsList();
     console.log('Dictionary Notebook initialized!', currentUser ? '(Logged in)' : '(Guest mode)');
