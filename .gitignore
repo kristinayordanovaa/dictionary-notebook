@@ -13,3 +13,4 @@ SUPABASE_SETUP.md
 SYNC_IMPLEMENTATION.md
 QUICK_START.md
 AUTH_SETUP.sql
+app-old-with-indexdb.js

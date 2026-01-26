@@ -41,31 +41,16 @@
                 My Dictionary
             </span>
             <div class="d-flex gap-2 align-items-center">
-                <!-- Guest Mode Badge -->
-                <span id="guestBadge" class="badge bg-warning text-dark" style="display: none;">
-                    <i class="bi bi-person"></i> Guest Mode
-                </span>
-                <!-- Sync Status Badge -->
-                <span id="syncStatus" class="badge bg-secondary" style="display: none;">
-                    <i class="bi bi-cloud-check"></i> Synced
-                </span>
                 <!-- User Info (shown when logged in) -->
-                <span id="userInfo" class="text-white small" style="display: none;">
+                <span id="userInfo" class="text-white small">
                     <i class="bi bi-person-circle"></i> <span id="userEmail"></span>
                 </span>
                 <!-- Add Word Button -->
                 <button class="btn btn-light btn-sm" id="addWordBtn">
                     <i class="bi bi-plus-lg"></i> Add Word
                 </button>
-                <!-- Auth Buttons (shown when logged out) -->
-                <button class="btn btn-outline-light btn-sm" id="loginBtn" style="display: none;">
-                    <i class="bi bi-box-arrow-in-right"></i> Login
-                </button>
-                <button class="btn btn-light btn-sm" id="signupBtn" style="display: none;">
-                    <i class="bi bi-person-plus"></i> Sign Up
-                </button>
-                <!-- Logout Button (shown when logged in) -->
-                <button class="btn btn-outline-light btn-sm" id="logoutBtn" style="display: none;">
+                <!-- Logout Button -->
+                <button class="btn btn-outline-light btn-sm" id="logoutBtn">
                     <i class="bi bi-box-arrow-right"></i> Logout
                 </button>
                 <!-- Install Button -->
@@ -76,7 +61,46 @@
         </div>
     </nav>
 
-    <div class="container-fluid mt-3">
+    <!-- Auth Landing Page (shown when not logged in) -->
+    <div id="authLanding" class="container" style="display: none;">
+        <div class="row justify-content-center align-items-center" style="min-height: 80vh;">
+            <div class="col-md-6 col-lg-5">
+                <div class="text-center mb-5">
+                    <h1 class="display-4 mb-3">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle;">
+                            <path d="M13.4 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7.4"/>
+                            <path d="M2 6h4"/>
+                            <path d="M2 10h4"/>
+                            <path d="M2 14h4"/>
+                            <path d="M2 18h4"/>
+                            <path d="M21.378 5.626a1 1 0 1 0-3.004-3.004l-5.01 5.012a2 2 0 0 0-.506.854l-.837 2.87a.5.5 0 0 0 .62.62l2.87-.837a2 2 0 0 0 .854-.506z"/>
+                        </svg>
+                        <br>
+                        My Dictionary
+                    </h1>
+                    <p class="lead text-muted">Build and sync your personal vocabulary across all devices</p>
+                </div>
+                
+                <div class="d-grid gap-3">
+                    <button class="btn btn-primary btn-lg" id="landingLoginBtn">
+                        <i class="bi bi-box-arrow-in-right"></i> Login to Your Account
+                    </button>
+                    <button class="btn btn-outline-primary btn-lg" id="landingSignupBtn">
+                        <i class="bi bi-person-plus"></i> Create New Account
+                    </button>
+                </div>
+                
+                <div class="text-center mt-4">
+                    <small class="text-muted">
+                        <i class="bi bi-cloud-check"></i> All your words are securely stored in the cloud
+                    </small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Content (hidden until logged in) -->
+    <div id="mainContent" class="container-fluid mt-3" style="display: none;">
         <div class="row">
             <div class="col-12">
                 <div class="mb-3">
@@ -103,12 +127,7 @@
         </div>
     </div>
 
-    <!-- Guest Mode Info Footer -->
-    <div id="guestModeFooter" class="text-center py-3" style="display: none;">
-        <small class="text-muted" style="color: #d0d0d0 !important; opacity: 0.6;">
-            💡 Using guest mode - data saved locally only. <a href="#" id="registerLinkFooter" style="color: #999;">Sign up</a> to sync across devices.
-        </small>
-    </div>
+
 
     <!-- Add Word Modal -->
     <div class="modal fade" id="addWordModal" tabindex="-1">
@@ -235,6 +254,9 @@
                         <input type="password" class="form-control" id="loginPassword" placeholder="••••••••" required>
                     </div>
                     <div id="loginError" class="alert alert-danger" style="display: none;"></div>
+                    <p class="text-center mb-0">
+                        <small>Don't have an account? <a href="#" id="showSignupLink">Sign up</a></small>
+                    </p>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
@@ -265,11 +287,14 @@
                         <div class="form-text">At least 6 characters</div>
                     </div>
                     <div class="mb-3">
-                        <label for="signupPasswordConfirm" class="form-label">Confirm Password</label>
-                        <input type="password" class="form-control" id="signupPasswordConfirm" placeholder="••••••••" required>
+                        <label for="signupConfirmPassword" class="form-label">Confirm Password</label>
+                        <input type="password" class="form-control" id="signupConfirmPassword" placeholder="••••••••" required>
                     </div>
                     <div id="signupError" class="alert alert-danger" style="display: none;"></div>
                     <div id="signupSuccess" class="alert alert-success" style="display: none;"></div>
+                    <p class="text-center mb-0">
+                        <small>Already have an account? <a href="#" id="showLoginLink">Login</a></small>
+                    </p>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>

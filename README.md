@@ -1,14 +1,13 @@
 # Dictionary Notebook PWA
 
-A Progressive Web App for managing your personal dictionary with cloud sync and multi-device support.
+A cloud-based Progressive Web App for managing your personal dictionary with real-time sync across all your devices.
 
 ## Features
 
-- ✅ **User Authentication**: Sign up and login to sync your words across devices
-- ✅ **Cloud Sync**: Automatic synchronization with Supabase backend
-- ✅ **Guest Mode**: Use locally without an account (offline-only)
-- ✅ **Multi-Device Support**: Access your dictionary from any device when logged in
-- ✅ **Local Storage**: All data saved in IndexedDB (works offline)
+- ✅ **User Authentication**: Required - Sign up and login to use the app
+- ✅ **Cloud Storage**: All data stored securely in Supabase cloud database
+- ✅ **Real-Time Sync**: Instant synchronization across all your devices
+- ✅ **Multi-Device Support**: Access your dictionary from anywhere
 - ✅ **PWA**: Installable on iOS and Android
 - ✅ **Search**: Filter your saved words
 - ✅ **CRUD operations**: Create, read, update, delete words
@@ -18,20 +17,14 @@ A Progressive Web App for managing your personal dictionary with cloud sync and 
 
 ## How It Works
 
-### Guest Mode (Offline)
-- Use the app without creating an account
-- All words saved locally in your browser
-- Works completely offline
-- Data stays on your device only
-
-### Authenticated Mode (Cloud Sync)
-1. **Sign Up**: Create an account with email and password
+### Cloud-Only Architecture
+1. **Sign Up**: Create an account with email and password (required to use the app)
 2. **Login**: Access your dictionary from any device
-3. **Auto Sync**: Every add/edit/delete automatically syncs to cloud
-4. **Cross-Device**: Words appear on all your logged-in devices
-5. **Private**: Each user has their own private dictionary
+3. **Real-Time Sync**: All operations (add/edit/delete) go directly to the cloud
+4. **Cross-Device**: Words instantly appear on all your logged-in devices
+5. **Private**: Each user has their own private dictionary with row-level security
 
-**Note**: You need to be logged in to sync data across devices. Guest mode keeps everything local.
+**Note**: Authentication is required to use this app. All data is stored in the cloud, not locally. This ensures your dictionary is always available on any device you log in from.
 
 ## Installation on Devices
 
@@ -67,8 +60,8 @@ Dictionary-notebook/
 
 - **Frontend**: HTML5, CSS3, JavaScript (ES6+)
 - **UI Framework**: Bootstrap 5
-- **Local Storage**: IndexedDB
-- **Backend**: Supabase (PostgreSQL + Authentication)
+- **Backend**: Supabase (PostgreSQL + Authentication + Row-Level Security)
+- **Cloud Database**: Supabase PostgreSQL
 - **Hosting**: Netlify
 - **PWA**: Service Worker, Web App Manifest
 
