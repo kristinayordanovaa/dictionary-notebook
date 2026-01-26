@@ -3,3 +3,12 @@
 node_modules/
 .netlify/
 dist/
+
+# Supabase credentials (don't commit to public repos)
+# Note: The anon key is safe to expose for Supabase, but keeping it private is good practice
+# config.js
+
+# Setup/instruction files (personal use only)
+SUPABASE_SETUP.md
+SYNC_IMPLEMENTATION.md
+QUICK_START.md

@@ -4,6 +4,68 @@ const DB_NAME = 'DictionaryDB';
 const DB_VERSION = 1;
 const STORE_NAME = 'words';
 
+// Supabase Setup
+let supabaseClient = null;
+let isOnline = navigator.onLine;
+let deviceId = localStorage.getItem('deviceId') || generateDeviceId();
+
+function generateDeviceId() {
+    const id = 'device_' + Math.random().toString(36).substr(2, 9) + '_' + Date.now();
+    localStorage.setItem('deviceId', id);
+    return id;
+}
+
+// Initialize Supabase
+function initSupabase() {
+    if (typeof supabase !== 'undefined' && SUPABASE_URL && SUPABASE_ANON_KEY && 
+        SUPABASE_URL !== 'YOUR_SUPABASE_URL') {
+        supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        console.log('Supabase initialized');
+        updateSyncStatus('connected');
+        return true;
+    }
+    console.log('Supabase not configured - running in offline mode');
+    return false;
+}
+
+// Sync status indicator
+function updateSyncStatus(status) {
+    const statusBadge = document.getElementById('syncStatus');
+    if (!statusBadge) return;
+    
+    statusBadge.style.display = 'inline-block';
+    
+    switch(status) {
+        case 'syncing':
+            statusBadge.className = 'badge bg-info';
+            statusBadge.innerHTML = '<i class="bi bi-arrow-repeat"></i> Syncing...';
+            break;
+        case 'synced':
+            statusBadge.className = 'badge bg-success';
+            statusBadge.innerHTML = '<i class="bi bi-cloud-check"></i> Synced';
+            setTimeout(() => {
+                if (statusBadge.innerHTML.includes('Synced')) {
+                    statusBadge.style.display = 'none';
+                }
+            }, 3000);
+            break;
+        case 'offline':
+            statusBadge.className = 'badge bg-warning text-dark';
+            statusBadge.innerHTML = '<i class="bi bi-wifi-off"></i> Offline';
+            break;
+        case 'error':
+            statusBadge.className = 'badge bg-danger';
+            statusBadge.innerHTML = '<i class="bi bi-exclamation-triangle"></i> Sync Error';
+            setTimeout(() => statusBadge.style.display = 'none', 5000);
+            break;
+        case 'connected':
+            statusBadge.className = 'badge bg-success';
+            statusBadge.innerHTML = '<i class="bi bi-cloud-check"></i> Connected';
+            setTimeout(() => statusBadge.style.display = 'none', 2000);
+            break;
+    }
+}
+
 // Initialize IndexedDB
 function initDB() {
     return new Promise((resolve, reject) => {
@@ -92,6 +154,133 @@ async function findWordByName(word) {
         // Check if input word is contained in existing word or vice versa
         return existingWord.includes(searchTerm) || searchTerm.includes(existingWord);
     });
+}
+
+// ===== SUPABASE SYNC FUNCTIONS =====
+
+// Sync a single word to Supabase
+async function syncWordToCloud(wordData) {
+    if (!supabaseClient || !isOnline) {
+        console.log('Sync skipped: offline or not configured');
+        return false;
+    }
+    
+    try {
+        updateSyncStatus('syncing');
+        
+        // Check if word already exists in cloud
+        const { data: existingList } = await supabaseClient
+            .from('words')
+            .select('*')
+            .eq('device_id', deviceId)
+            .eq('local_id', wordData.id);
+        
+        const existing = existingList && existingList.length > 0 ? existingList[0] : null;
+        
+        if (existing) {
+            // Update existing
+            const { error } = await supabaseClient
+                .from('words')
+                .update({
+                    word: wordData.word,
+                    description: wordData.description,
+                    timestamp: wordData.timestamp,
+                    updated_at: new Date().toISOString()
+                })
+                .eq('id', existing.id);
+            
+            if (error) throw error;
+        } else {
+            // Insert new
+            const { error } = await supabaseClient
+                .from('words')
+                .insert({
+                    device_id: deviceId,
+                    local_id: wordData.id,
+                    word: wordData.word,
+                    description: wordData.description,
+                    timestamp: wordData.timestamp
+                });
+            
+            if (error) throw error;
+        }
+        
+        updateSyncStatus('synced');
+        return true;
+    } catch (error) {
+        console.error('Sync error:', error);
+        updateSyncStatus('error');
+        return false;
+    }
+}
+
+// Delete word from cloud
+async function deleteWordFromCloud(wordId) {
+    if (!supabaseClient || !isOnline) return false;
+    
+    try {
+        updateSyncStatus('syncing');
+        
+        const { error } = await supabaseClient
+            .from('words')
+            .delete()
+            .eq('device_id', deviceId)
+            .eq('local_id', wordId);
+        
+        if (error) throw error;
+        
+        updateSyncStatus('synced');
+        return true;
+    } catch (error) {
+        console.error('Delete sync error:', error);
+        updateSyncStatus('error');
+        return false;
+    }
+}
+
+// Pull all words from cloud on app load
+async function pullFromCloud() {
+    if (!supabaseClient || !isOnline) return;
+    
+    try {
+        updateSyncStatus('syncing');
+        
+        const { data: cloudWords, error } = await supabaseClient
+            .from('words')
+            .select('*')
+            .order('timestamp', { ascending: true });
+        
+        if (error) throw error;
+        
+        if (!cloudWords || cloudWords.length === 0) {
+            updateSyncStatus('synced');
+            return;
+        }
+        
+        // Merge cloud words with local
+        const localWords = await getAllWords();
+        const localMap = new Map(localWords.map(w => [w.id, w]));
+        
+        for (const cloudWord of cloudWords) {
+            const localWord = localMap.get(cloudWord.local_id);
+            
+            if (!localWord) {
+                // Word exists in cloud but not local - add it
+                await saveWord(cloudWord.word, cloudWord.description);
+            } else {
+                // Compare timestamps - keep newer version
+                if (new Date(cloudWord.timestamp) > new Date(localWord.timestamp)) {
+                    await updateWord(localWord.id, cloudWord.word, cloudWord.description);
+                }
+            }
+        }
+        
+        updateSyncStatus('synced');
+        await renderWordsList();
+    } catch (error) {
+        console.error('Pull error:', error);
+        updateSyncStatus('error');
+    }
 }
 
 // Translation API Integration (MyMemory Translation API)
@@ -207,7 +396,7 @@ async function renderWordsList(searchTerm = '') {
     if (filteredWords.length === 0) {
         wordsList.innerHTML = searchTerm 
             ? '<tr><td colspan="3" class="text-muted text-center">No matching words found.</td></tr>'
-            : '<tr><td colspan="3" class="text-muted text-center">No words saved yet. Click "Add Word" to start building your dictionary!</td></tr>';
+            : '<tr><td colspan="3" class="text-center py-5"><div class="text-muted mb-3">No words saved yet.<br>Click the button below to start building your dictionary!</div><button class="btn btn-primary" onclick="document.getElementById(\'addWordBtn\').click()"><i class="bi bi-plus-lg"></i> Add Word</button></td></tr>';
         return;
     }
     
@@ -270,7 +459,10 @@ document.getElementById('addWordBtn').addEventListener('click', () => {
     }, 500);
 });
 
-document.getElementById('saveBtn').addEventListener('click', async () => {
+document.getElementById('saveBtn').addEventListener('click', async function() {
+    // Blur button immediately to remove focus before modal closes
+    this.blur();
+    
     const word = document.getElementById('wordInput').value.trim();
     const description = document.getElementById('descriptionInput').value.trim();
     
@@ -287,10 +479,16 @@ document.getElementById('saveBtn').addEventListener('click', async () => {
         document.getElementById('updateWordName').textContent = word;
         document.getElementById('updateExistingDescription').textContent = existingWord.description;
         
-        // Store the data for the confirm button
-        document.getElementById('confirmUpdateBtn').dataset.existingId = existingWord.id;
-        document.getElementById('confirmUpdateBtn').dataset.word = word;
-        document.getElementById('confirmUpdateBtn').dataset.description = description;
+        // Store the data for both buttons
+        const confirmBtn = document.getElementById('confirmUpdateBtn');
+        const addNewBtn = document.getElementById('addAsNewBtn');
+        
+        confirmBtn.dataset.existingId = existingWord.id;
+        confirmBtn.dataset.word = word;
+        confirmBtn.dataset.description = description;
+        
+        addNewBtn.dataset.word = word;
+        addNewBtn.dataset.description = description;
         
         const updateModal = new bootstrap.Modal(document.getElementById('updateConfirmModal'));
         updateModal.show();
@@ -303,6 +501,7 @@ document.getElementById('saveBtn').addEventListener('click', async () => {
 
 // Handle the actual save/update when confirmed
 document.getElementById('confirmUpdateBtn').addEventListener('click', async function() {
+    this.blur();
     const existingId = parseInt(this.dataset.existingId);
     const word = this.dataset.word;
     const description = this.dataset.description;
@@ -314,18 +513,39 @@ document.getElementById('confirmUpdateBtn').addEventListener('click', async func
     await performSave(existingId, word, description);
 });
 
+// Handle adding as new word even if duplicate exists
+document.getElementById('addAsNewBtn').addEventListener('click', async function() {
+    this.blur();
+    const word = this.dataset.word;
+    const description = this.dataset.description;
+    
+    // Close the update confirmation modal
+    const updateModal = bootstrap.Modal.getInstance(document.getElementById('updateConfirmModal'));
+    updateModal.hide();
+    
+    // Force save as new (pass null as existingId)
+    await performSave(null, word, description);
+});
+
 async function performSave(existingId, word, description) {
     try {
+        let savedId;
+        
         if (existingId) {
             await updateWord(existingId, word, description);
+            savedId = existingId;
         } else {
-            await saveWord(word, description);
+            savedId = await saveWord(word, description);
         }
-        if (existingId) {
-            await updateWord(existingId, word, description);
-        } else {
-            await saveWord(word, description);
-        }
+        
+        // Sync to cloud after every change
+        const wordData = {
+            id: savedId,
+            word: word,
+            description: description,
+            timestamp: new Date().toISOString()
+        };
+        await syncWordToCloud(wordData);
         
         // Clear inputs
         document.getElementById('wordInput').value = '';
@@ -333,7 +553,8 @@ async function performSave(existingId, word, description) {
         document.getElementById('existingWordAlert').style.display = 'none';
         
         // Close add word modal
-        const modal = bootstrap.Modal.getInstance(document.getElementById('addWordModal'));
+        const modalEl = document.getElementById('addWordModal');
+        const modal = bootstrap.Modal.getInstance(modalEl);
         if (modal) {
             modal.hide();
         }
@@ -404,6 +625,15 @@ document.getElementById('updateBtn').addEventListener('click', async () => {
     try {
         await updateWord(currentEditId, word, description);
         
+        // Sync to cloud after edit
+        const wordData = {
+            id: currentEditId,
+            word: word,
+            description: description,
+            timestamp: new Date().toISOString()
+        };
+        await syncWordToCloud(wordData);
+        
         const modal = bootstrap.Modal.getInstance(document.getElementById('editModal'));
         modal.hide();
         
@@ -437,13 +667,22 @@ async function handleDelete(e) {
 // Handle the actual deletion when confirmed
 document.getElementById('confirmDeleteBtn').addEventListener('click', async function() {
     const id = parseInt(this.dataset.deleteId);
+    const modalEl = document.getElementById('deleteModal');
+    const modal = bootstrap.Modal.getInstance(modalEl);
+    
+    // Blur the button immediately to remove focus before modal closes
+    this.blur();
+    
+    // Close the modal
+    if (modal) {
+        modal.hide();
+    }
     
     try {
         await deleteWord(id);
         
-        // Close the modal
-        const modal = bootstrap.Modal.getInstance(document.getElementById('deleteModal'));
-        modal.hide();
+        // Sync deletion to cloud
+        await deleteWordFromCloud(id);
         
         await renderWordsList();
         showToast('Word deleted successfully!');
@@ -506,11 +745,35 @@ if ('serviceWorker' in navigator) {
 }
 
 // Initialize App
-initDB().then(() => {
+initDB().then(async () => {
+    // Initialize Supabase
+    const supabaseEnabled = initSupabase();
+    
+    // Pull data from cloud if available
+    if (supabaseEnabled) {
+        await pullFromCloud();
+    }
+    
     renderWordsList();
-    console.log('Dictionary Notebook initialized!');
+    console.log('Dictionary Notebook initialized!', supabaseEnabled ? '(Cloud sync enabled)' : '(Offline mode)');
 }).catch(err => {
     console.error('Failed to initialize database:', err);
     alert('Failed to initialize app. Please try refreshing the page.');
 });
+
+// Online/Offline detection
+window.addEventListener('online', async () => {
+    isOnline = true;
+    console.log('Back online - syncing...');
+    if (supabaseClient) {
+        await pullFromCloud();
+    }
+});
+
+window.addEventListener('offline', () => {
+    isOnline = false;
+    updateSyncStatus('offline');
+    console.log('Offline - changes will sync when back online');
+});
+
 /* Cache bust: Mon Jan 26 11:20:21 EET 2026 */
