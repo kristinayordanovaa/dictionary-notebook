@@ -45,6 +45,7 @@ function updateUIForAuthState(isLoggedIn) {
     const userEmail = document.getElementById('userEmail');
     const guestBadge = document.getElementById('guestBadge');
     const syncStatus = document.getElementById('syncStatus');
+    const guestModeFooter = document.getElementById('guestModeFooter');
     
     if (isLoggedIn && currentUser) {
         // Logged in state
@@ -54,6 +55,7 @@ function updateUIForAuthState(isLoggedIn) {
         userInfo.style.display = 'inline-block';
         userEmail.textContent = currentUser.email;
         guestBadge.style.display = 'none';
+        guestModeFooter.style.display = 'none';
     } else {
         // Logged out state (guest mode)
         loginBtn.style.display = 'inline-block';
@@ -62,6 +64,7 @@ function updateUIForAuthState(isLoggedIn) {
         userInfo.style.display = 'none';
         guestBadge.style.display = 'inline-block';
         syncStatus.style.display = 'none';
+        guestModeFooter.style.display = 'block';
     }
 }
 
@@ -223,13 +226,17 @@ async function updateWord(id, word, description) {
 }
 
 async function deleteWord(id) {
-    const transaction = db.transaction([STORE_NAME], 'readwrite');
-    const store = transaction.objectStore(STORE_NAME);
-    
     return new Promise((resolve, reject) => {
+        const transaction = db.transaction([STORE_NAME], 'readwrite');
+        const store = transaction.objectStore(STORE_NAME);
         const request = store.delete(id);
+        
         request.onsuccess = () => resolve();
         request.onerror = () => reject(request.error);
+        
+        // Ensure transaction completes
+        transaction.oncomplete = () => resolve();
+        transaction.onerror = () => reject(transaction.error);
     });
 }
 
@@ -812,14 +819,19 @@ document.getElementById('confirmDeleteBtn').addEventListener('click', async func
     }
     
     try {
+        // Delete from local database first
         await deleteWord(id);
+        console.log('Word deleted from IndexedDB:', id);
         
-        // Sync deletion to cloud
+        // Then sync deletion to cloud
         await deleteWordFromCloud(id);
+        console.log('Word deletion synced to cloud');
         
+        // Refresh the list
         await renderWordsList();
         showToast('Word deleted successfully!');
     } catch (error) {
+        console.error('Error deleting word:', error);
         alert('Error deleting word: ' + error.message);
     }
 });
@@ -1027,6 +1039,12 @@ document.getElementById('logoutBtn').addEventListener('click', async () => {
     } catch (error) {
         alert('Logout failed: ' + error.message);
     }
+});
+
+// Footer register link
+document.getElementById('registerLinkFooter').addEventListener('click', (e) => {
+    e.preventDefault();
+    document.getElementById('signupBtn').click();
 });
 
 // Online/Offline detection
