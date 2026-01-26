@@ -318,7 +318,7 @@ async function deleteWordFromCloud(wordId) {
     try {
         updateSyncStatus('syncing');
         
-        // Get the word to find its cloud ID
+        // Get the word to find its cloud ID or word details
         const transaction = db.transaction([STORE_NAME], 'readonly');
         const store = transaction.objectStore(STORE_NAME);
         const request = store.get(wordId);
@@ -327,7 +327,16 @@ async function deleteWordFromCloud(wordId) {
             request.onsuccess = async () => {
                 const word = request.result;
                 
-                if (word && word.cloudId) {
+                if (!word) {
+                    console.log('Word already deleted locally');
+                    resolve(true);
+                    return;
+                }
+                
+                let deleted = false;
+                
+                if (word.cloudId) {
+                    // Delete by cloud ID
                     const { error } = await supabaseClient
                         .from('words')
                         .delete()
@@ -335,15 +344,33 @@ async function deleteWordFromCloud(wordId) {
                         .eq('user_id', currentUser.id);
                     
                     if (error) {
-                        console.error('Delete sync error:', error);
+                        console.error('Delete by cloudId error:', error);
+                    } else {
+                        deleted = true;
+                        console.log('Deleted from cloud by cloudId:', word.cloudId);
+                    }
+                }
+                
+                // If no cloudId or delete failed, try matching by word and description
+                if (!deleted) {
+                    const { error } = await supabaseClient
+                        .from('words')
+                        .delete()
+                        .eq('user_id', currentUser.id)
+                        .eq('word', word.word)
+                        .eq('description', word.description);
+                    
+                    if (error) {
+                        console.error('Delete by match error:', error);
                         updateSyncStatus('error');
                         resolve(false);
                     } else {
+                        console.log('Deleted from cloud by matching:', word.word);
                         updateSyncStatus('synced');
                         resolve(true);
                     }
                 } else {
-                    // Word wasn't synced yet, no need to delete from cloud
+                    updateSyncStatus('synced');
                     resolve(true);
                 }
             };
