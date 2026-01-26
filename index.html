@@ -41,12 +41,34 @@
                 My Dictionary
             </span>
             <div class="d-flex gap-2 align-items-center">
+                <!-- Guest Mode Badge -->
+                <span id="guestBadge" class="badge bg-warning text-dark" style="display: none;">
+                    <i class="bi bi-person"></i> Guest Mode
+                </span>
+                <!-- Sync Status Badge -->
                 <span id="syncStatus" class="badge bg-secondary" style="display: none;">
                     <i class="bi bi-cloud-check"></i> Synced
                 </span>
+                <!-- User Info (shown when logged in) -->
+                <span id="userInfo" class="text-white small" style="display: none;">
+                    <i class="bi bi-person-circle"></i> <span id="userEmail"></span>
+                </span>
+                <!-- Add Word Button -->
                 <button class="btn btn-light btn-sm" id="addWordBtn">
                     <i class="bi bi-plus-lg"></i> Add Word
                 </button>
+                <!-- Auth Buttons (shown when logged out) -->
+                <button class="btn btn-outline-light btn-sm" id="loginBtn" style="display: none;">
+                    <i class="bi bi-box-arrow-in-right"></i> Login
+                </button>
+                <button class="btn btn-light btn-sm" id="signupBtn" style="display: none;">
+                    <i class="bi bi-person-plus"></i> Sign Up
+                </button>
+                <!-- Logout Button (shown when logged in) -->
+                <button class="btn btn-outline-light btn-sm" id="logoutBtn" style="display: none;">
+                    <i class="bi bi-box-arrow-right"></i> Logout
+                </button>
+                <!-- Install Button -->
                 <button class="btn btn-outline-light btn-sm" id="installBtn" style="display: none;">
                     <i class="bi bi-download"></i> Install
                 </button>
@@ -66,7 +88,7 @@
                         <thead>
                             <tr>
                                 <th style="width: 200px;">Word</th>
-                                <th>Description</th>
+                                <th>Translation</th>
                                 <th style="width: 100px;">Actions</th>
                             </tr>
                         </thead>
@@ -98,8 +120,8 @@
                         </div>
                     </div>
                     <div class="mb-3">
-                        <label for="descriptionInput" class="form-label">Description / Notes</label>
-                        <textarea class="form-control" id="descriptionInput" rows="6" placeholder="Add your own description, examples, or notes..."></textarea>
+                        <label for="descriptionInput" class="form-label">Translation / Notes</label>
+                        <textarea class="form-control" id="descriptionInput" rows="6" placeholder="Add translation, examples, or notes..."></textarea>
                     </div>
                 </div>
                 <div class="modal-footer">
@@ -126,7 +148,7 @@
                         <input type="text" class="form-control" id="editWord">
                     </div>
                     <div class="mb-3">
-                        <label for="editDescription" class="form-label">Description</label>
+                        <label for="editDescription" class="form-label">Translation</label>
                         <textarea class="form-control" id="editDescription" rows="6"></textarea>
                     </div>
                 </div>
@@ -169,7 +191,7 @@
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
-                    <p>The word <strong id="updateWordName"></strong> already exists with the description:</p>
+                    <p>The word <strong id="updateWordName"></strong> already exists with the translation:</p>
                     <div class="alert alert-secondary">
                         <p id="updateExistingDescription" class="mb-0"></p>
                     </div>
@@ -182,6 +204,70 @@
                     </button>
                     <button type="button" class="btn btn-primary" id="confirmUpdateBtn">
                         <i class="bi bi-arrow-repeat"></i> Update
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Login Modal -->
+    <div class="modal fade" id="loginModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title"><i class="bi bi-box-arrow-in-right"></i> Login</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="loginEmail" class="form-label">Email</label>
+                        <input type="email" class="form-control" id="loginEmail" placeholder="your@email.com" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="loginPassword" class="form-label">Password</label>
+                        <input type="password" class="form-control" id="loginPassword" placeholder="••••••••" required>
+                    </div>
+                    <div id="loginError" class="alert alert-danger" style="display: none;"></div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" id="loginSubmitBtn">
+                        <i class="bi bi-box-arrow-in-right"></i> Login
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Signup Modal -->
+    <div class="modal fade" id="signupModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-success text-white">
+                    <h5 class="modal-title"><i class="bi bi-person-plus"></i> Sign Up</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="signupEmail" class="form-label">Email</label>
+                        <input type="email" class="form-control" id="signupEmail" placeholder="your@email.com" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="signupPassword" class="form-label">Password</label>
+                        <input type="password" class="form-control" id="signupPassword" placeholder="••••••••" required>
+                        <div class="form-text">At least 6 characters</div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="signupPasswordConfirm" class="form-label">Confirm Password</label>
+                        <input type="password" class="form-control" id="signupPasswordConfirm" placeholder="••••••••" required>
+                    </div>
+                    <div id="signupError" class="alert alert-danger" style="display: none;"></div>
+                    <div id="signupSuccess" class="alert alert-success" style="display: none;"></div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-success" id="signupSubmitBtn">
+                        <i class="bi bi-person-plus"></i> Sign Up
                     </button>
                 </div>
             </div>

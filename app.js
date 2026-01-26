@@ -7,13 +7,7 @@ const STORE_NAME = 'words';
 // Supabase Setup
 let supabaseClient = null;
 let isOnline = navigator.onLine;
-let deviceId = localStorage.getItem('deviceId') || generateDeviceId();
-
-function generateDeviceId() {
-    const id = 'device_' + Math.random().toString(36).substr(2, 9) + '_' + Date.now();
-    localStorage.setItem('deviceId', id);
-    return id;
-}
+let currentUser = null;
 
 // Initialize Supabase
 function initSupabase() {
@@ -21,11 +15,103 @@ function initSupabase() {
         SUPABASE_URL !== 'YOUR_SUPABASE_URL') {
         supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
         console.log('Supabase initialized');
-        updateSyncStatus('connected');
         return true;
     }
     console.log('Supabase not configured - running in offline mode');
     return false;
+}
+
+// ===== AUTHENTICATION FUNCTIONS =====
+
+async function checkAuth() {
+    if (!supabaseClient) return null;
+    
+    const { data: { session } } = await supabaseClient.auth.getSession();
+    if (session) {
+        currentUser = session.user;
+        updateUIForAuthState(true);
+        return session.user;
+    }
+    
+    updateUIForAuthState(false);
+    return null;
+}
+
+function updateUIForAuthState(isLoggedIn) {
+    const loginBtn = document.getElementById('loginBtn');
+    const signupBtn = document.getElementById('signupBtn');
+    const logoutBtn = document.getElementById('logoutBtn');
+    const userInfo = document.getElementById('userInfo');
+    const userEmail = document.getElementById('userEmail');
+    const guestBadge = document.getElementById('guestBadge');
+    const syncStatus = document.getElementById('syncStatus');
+    
+    if (isLoggedIn && currentUser) {
+        // Logged in state
+        loginBtn.style.display = 'none';
+        signupBtn.style.display = 'none';
+        logoutBtn.style.display = 'inline-block';
+        userInfo.style.display = 'inline-block';
+        userEmail.textContent = currentUser.email;
+        guestBadge.style.display = 'none';
+    } else {
+        // Logged out state (guest mode)
+        loginBtn.style.display = 'inline-block';
+        signupBtn.style.display = 'inline-block';
+        logoutBtn.style.display = 'none';
+        userInfo.style.display = 'none';
+        guestBadge.style.display = 'inline-block';
+        syncStatus.style.display = 'none';
+    }
+}
+
+async function handleSignup(email, password) {
+    if (!supabaseClient) {
+        throw new Error('Authentication not available');
+    }
+    
+    const { data, error } = await supabaseClient.auth.signUp({
+        email: email,
+        password: password
+    });
+    
+    if (error) throw error;
+    return data;
+}
+
+async function handleLogin(email, password) {
+    if (!supabaseClient) {
+        throw new Error('Authentication not available');
+    }
+    
+    const { data, error } = await supabaseClient.auth.signInWithPassword({
+        email: email,
+        password: password
+    });
+    
+    if (error) throw error;
+    
+    currentUser = data.user;
+    updateUIForAuthState(true);
+    
+    // Pull data from cloud after login
+    await pullFromCloud();
+    await renderWordsList();
+    
+    return data;
+}
+
+async function handleLogout() {
+    if (!supabaseClient) return;
+    
+    const { error } = await supabaseClient.auth.signOut();
+    if (error) throw error;
+    
+    currentUser = null;
+    updateUIForAuthState(false);
+    
+    // Refresh to show local data only
+    await renderWordsList();
 }
 
 // Sync status indicator
@@ -160,8 +246,8 @@ async function findWordByName(word) {
 
 // Sync a single word to Supabase
 async function syncWordToCloud(wordData) {
-    if (!supabaseClient || !isOnline) {
-        console.log('Sync skipped: offline or not configured');
+    if (!supabaseClient || !isOnline || !currentUser) {
+        console.log('Sync skipped: offline, not configured, or not logged in');
         return false;
     }
     
@@ -172,7 +258,7 @@ async function syncWordToCloud(wordData) {
         const { data: existingList } = await supabaseClient
             .from('words')
             .select('*')
-            .eq('device_id', deviceId)
+            .eq('user_id', currentUser.id)
             .eq('local_id', wordData.id);
         
         const existing = existingList && existingList.length > 0 ? existingList[0] : null;
@@ -195,7 +281,7 @@ async function syncWordToCloud(wordData) {
             const { error } = await supabaseClient
                 .from('words')
                 .insert({
-                    device_id: deviceId,
+                    user_id: currentUser.id,
                     local_id: wordData.id,
                     word: wordData.word,
                     description: wordData.description,
@@ -216,7 +302,7 @@ async function syncWordToCloud(wordData) {
 
 // Delete word from cloud
 async function deleteWordFromCloud(wordId) {
-    if (!supabaseClient || !isOnline) return false;
+    if (!supabaseClient || !isOnline || !currentUser) return false;
     
     try {
         updateSyncStatus('syncing');
@@ -224,7 +310,7 @@ async function deleteWordFromCloud(wordId) {
         const { error } = await supabaseClient
             .from('words')
             .delete()
-            .eq('device_id', deviceId)
+            .eq('user_id', currentUser.id)
             .eq('local_id', wordId);
         
         if (error) throw error;
@@ -240,7 +326,7 @@ async function deleteWordFromCloud(wordId) {
 
 // Pull all words from cloud on app load
 async function pullFromCloud() {
-    if (!supabaseClient || !isOnline) return;
+    if (!supabaseClient || !isOnline || !currentUser) return;
     
     try {
         updateSyncStatus('syncing');
@@ -248,6 +334,7 @@ async function pullFromCloud() {
         const { data: cloudWords, error } = await supabaseClient
             .from('words')
             .select('*')
+            .eq('user_id', currentUser.id)
             .order('timestamp', { ascending: true });
         
         if (error) throw error;
@@ -408,7 +495,7 @@ async function renderWordsList(searchTerm = '') {
             <td class="word-cell">
                 <strong>${escapeHtml(word.word)}</strong>
             </td>
-            <td class="description-cell">
+            <td class="translation-cell">
                 ${escapeHtml(word.description)}
             </td>
             <td class="actions-cell">
@@ -467,7 +554,7 @@ document.getElementById('saveBtn').addEventListener('click', async function() {
     const description = document.getElementById('descriptionInput').value.trim();
     
     if (!word || !description) {
-        alert('Please enter both a word and description.');
+        alert('Please enter both a word and translation.');
         return;
     }
     
@@ -749,23 +836,158 @@ initDB().then(async () => {
     // Initialize Supabase
     const supabaseEnabled = initSupabase();
     
-    // Pull data from cloud if available
+    // Check authentication status
     if (supabaseEnabled) {
-        await pullFromCloud();
+        await checkAuth();
+        
+        // Pull data from cloud if logged in
+        if (currentUser) {
+            await pullFromCloud();
+        }
     }
     
     renderWordsList();
-    console.log('Dictionary Notebook initialized!', supabaseEnabled ? '(Cloud sync enabled)' : '(Offline mode)');
+    console.log('Dictionary Notebook initialized!', currentUser ? '(Logged in)' : '(Guest mode)');
 }).catch(err => {
     console.error('Failed to initialize database:', err);
     alert('Failed to initialize app. Please try refreshing the page.');
+});
+
+// ===== AUTH EVENT LISTENERS =====
+
+// Login button
+document.getElementById('loginBtn').addEventListener('click', () => {
+    const modal = new bootstrap.Modal(document.getElementById('loginModal'));
+    document.getElementById('loginError').style.display = 'none';
+    document.getElementById('loginEmail').value = '';
+    document.getElementById('loginPassword').value = '';
+    modal.show();
+});
+
+// Login submit
+document.getElementById('loginSubmitBtn').addEventListener('click', async function() {
+    this.blur();
+    const email = document.getElementById('loginEmail').value.trim();
+    const password = document.getElementById('loginPassword').value;
+    const errorDiv = document.getElementById('loginError');
+    
+    if (!email || !password) {
+        errorDiv.textContent = 'Please enter both email and password';
+        errorDiv.style.display = 'block';
+        return;
+    }
+    
+    try {
+        this.disabled = true;
+        this.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Logging in...';
+        
+        await handleLogin(email, password);
+        
+        const modal = bootstrap.Modal.getInstance(document.getElementById('loginModal'));
+        modal.hide();
+        
+        showToast('Logged in successfully!');
+    } catch (error) {
+        errorDiv.textContent = error.message || 'Login failed';
+        errorDiv.style.display = 'block';
+    } finally {
+        this.disabled = false;
+        this.innerHTML = '<i class="bi bi-box-arrow-in-right"></i> Login';
+    }
+});
+
+// Signup button
+document.getElementById('signupBtn').addEventListener('click', () => {
+    const modal = new bootstrap.Modal(document.getElementById('signupModal'));
+    document.getElementById('signupError').style.display = 'none';
+    document.getElementById('signupSuccess').style.display = 'none';
+    document.getElementById('signupEmail').value = '';
+    document.getElementById('signupPassword').value = '';
+    document.getElementById('signupPasswordConfirm').value = '';
+    modal.show();
+});
+
+// Signup submit
+document.getElementById('signupSubmitBtn').addEventListener('click', async function() {
+    this.blur();
+    const email = document.getElementById('signupEmail').value.trim();
+    const password = document.getElementById('signupPassword').value;
+    const passwordConfirm = document.getElementById('signupPasswordConfirm').value;
+    const errorDiv = document.getElementById('signupError');
+    const successDiv = document.getElementById('signupSuccess');
+    
+    errorDiv.style.display = 'none';
+    successDiv.style.display = 'none';
+    
+    if (!email || !password || !passwordConfirm) {
+        errorDiv.textContent = 'Please fill in all fields';
+        errorDiv.style.display = 'block';
+        return;
+    }
+    
+    if (password.length < 6) {
+        errorDiv.textContent = 'Password must be at least 6 characters';
+        errorDiv.style.display = 'block';
+        return;
+    }
+    
+    if (password !== passwordConfirm) {
+        errorDiv.textContent = 'Passwords do not match';
+        errorDiv.style.display = 'block';
+        return;
+    }
+    
+    try {
+        this.disabled = true;
+        this.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Creating account...';
+        
+        const result = await handleSignup(email, password);
+        
+        // Auto-login after signup if email confirmation is disabled
+        if (result.user && !result.user.identities || result.session) {
+            await handleLogin(email, password);
+            const modal = bootstrap.Modal.getInstance(document.getElementById('signupModal'));
+            modal.hide();
+            showToast('Account created and logged in!');
+        } else {
+            successDiv.textContent = 'Account created successfully! You can now login.';
+            successDiv.style.display = 'block';
+            
+            // Clear form
+            document.getElementById('signupEmail').value = '';
+            document.getElementById('signupPassword').value = '';
+            document.getElementById('signupPasswordConfirm').value = '';
+            
+            // Auto-close modal after 2 seconds
+            setTimeout(() => {
+                const modal = bootstrap.Modal.getInstance(document.getElementById('signupModal'));
+                modal.hide();
+            }, 2000);
+        }
+    } catch (error) {
+        errorDiv.textContent = error.message || 'Signup failed';
+        errorDiv.style.display = 'block';
+    } finally {
+        this.disabled = false;
+        this.innerHTML = '<i class="bi bi-person-plus"></i> Sign Up';
+    }
+});
+
+// Logout button
+document.getElementById('logoutBtn').addEventListener('click', async () => {
+    try {
+        await handleLogout();
+        showToast('Logged out successfully');
+    } catch (error) {
+        alert('Logout failed: ' + error.message);
+    }
 });
 
 // Online/Offline detection
 window.addEventListener('online', async () => {
     isOnline = true;
     console.log('Back online - syncing...');
-    if (supabaseClient) {
+    if (supabaseClient && currentUser) {
         await pullFromCloud();
     }
 });
