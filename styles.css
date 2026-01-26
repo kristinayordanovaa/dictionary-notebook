@@ -1,0 +1,76 @@
+body {
+    background-color: #ffffff;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    overflow-x: hidden;
+}
+
+* {
+    box-sizing: border-box;
+}
+
+.navbar {
+    background: #020024;
+    background: linear-gradient(90deg, rgba(2, 0, 36, 1) 0%, rgba(9, 9, 121, 1) 35%, rgba(0, 212, 255, 1) 100%) !important;
+}
+
+.modal-header {
+    background: #020024;
+    background: linear-gradient(90deg, rgba(2, 0, 36, 1) 0%, rgba(9, 9, 121, 1) 35%, rgba(0, 212, 255, 1) 100%) !important;
+}
+
+.container-fluid {
+    max-width: 100%;
+    overflow-x: hidden;
+}
+
+.table-responsive {
+    overflow-x: hidden;
+}
+
+/* Button styling */
+.btn-primary,
+.btn-light,
+.btn-outline-light,
+.btn-secondary,
+.btn-outline-primary,
+.btn-outline-danger {
+    background-color: #000000 !important;
+    color: #ffffff !important;
+    border-color: #000000 !important;
+}
+
+.btn-primary:hover,
+.btn-light:hover,
+.btn-outline-light:hover,
+.btn-secondary:hover,
+.btn-outline-primary:hover,
+.btn-outline-danger:hover {
+    background-color: #333333 !important;
+    border-color: #333333 !important;
+}
+
+/* PWA Install prompt styling */
+#installBtn {
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0%, 100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.7;
+    }
+}
+
+@media (max-width: 768px) {
+    body {
+        padding: 0;
+        margin: 0;
+    }
+    
+    .container-fluid {
+        padding-left: 12px !important;
+        padding-right: 12px !important;
+    }
+}
