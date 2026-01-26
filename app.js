@@ -169,6 +169,7 @@ function initDB() {
                 const objectStore = db.createObjectStore(STORE_NAME, { keyPath: 'id', autoIncrement: true });
                 objectStore.createIndex('word', 'word', { unique: false });
                 objectStore.createIndex('timestamp', 'timestamp', { unique: false });
+                objectStore.createIndex('cloudId', 'cloudId', { unique: false }); // Store cloud ID
             }
         };
     });
@@ -254,17 +255,10 @@ async function syncWordToCloud(wordData) {
     try {
         updateSyncStatus('syncing');
         
-        // Check if word already exists in cloud
-        const { data: existingList } = await supabaseClient
-            .from('words')
-            .select('*')
-            .eq('user_id', currentUser.id)
-            .eq('local_id', wordData.id);
+        let cloudId = wordData.cloudId;
         
-        const existing = existingList && existingList.length > 0 ? existingList[0] : null;
-        
-        if (existing) {
-            // Update existing
+        if (cloudId) {
+            // Update existing word in cloud
             const { error } = await supabaseClient
                 .from('words')
                 .update({
@@ -273,22 +267,32 @@ async function syncWordToCloud(wordData) {
                     timestamp: wordData.timestamp,
                     updated_at: new Date().toISOString()
                 })
-                .eq('id', existing.id);
+                .eq('id', cloudId)
+                .eq('user_id', currentUser.id);
             
             if (error) throw error;
         } else {
-            // Insert new
-            const { error } = await supabaseClient
+            // Insert new word to cloud
+            const { data, error } = await supabaseClient
                 .from('words')
                 .insert({
                     user_id: currentUser.id,
-                    local_id: wordData.id,
                     word: wordData.word,
                     description: wordData.description,
                     timestamp: wordData.timestamp
-                });
+                })
+                .select()
+                .single();
             
             if (error) throw error;
+            
+            // Store the cloud ID in local IndexedDB
+            if (data) {
+                const transaction = db.transaction([STORE_NAME], 'readwrite');
+                const store = transaction.objectStore(STORE_NAME);
+                wordData.cloudId = data.id;
+                store.put(wordData);
+            }
         }
         
         updateSyncStatus('synced');
@@ -307,16 +311,41 @@ async function deleteWordFromCloud(wordId) {
     try {
         updateSyncStatus('syncing');
         
-        const { error } = await supabaseClient
-            .from('words')
-            .delete()
-            .eq('user_id', currentUser.id)
-            .eq('local_id', wordId);
+        // Get the word to find its cloud ID
+        const transaction = db.transaction([STORE_NAME], 'readonly');
+        const store = transaction.objectStore(STORE_NAME);
+        const request = store.get(wordId);
         
-        if (error) throw error;
-        
-        updateSyncStatus('synced');
-        return true;
+        return new Promise((resolve, reject) => {
+            request.onsuccess = async () => {
+                const word = request.result;
+                
+                if (word && word.cloudId) {
+                    const { error } = await supabaseClient
+                        .from('words')
+                        .delete()
+                        .eq('id', word.cloudId)
+                        .eq('user_id', currentUser.id);
+                    
+                    if (error) {
+                        console.error('Delete sync error:', error);
+                        updateSyncStatus('error');
+                        resolve(false);
+                    } else {
+                        updateSyncStatus('synced');
+                        resolve(true);
+                    }
+                } else {
+                    // Word wasn't synced yet, no need to delete from cloud
+                    resolve(true);
+                }
+            };
+            
+            request.onerror = () => {
+                console.error('Failed to get word for deletion');
+                resolve(false);
+            };
+        });
     } catch (error) {
         console.error('Delete sync error:', error);
         updateSyncStatus('error');
@@ -346,18 +375,35 @@ async function pullFromCloud() {
         
         // Merge cloud words with local
         const localWords = await getAllWords();
-        const localMap = new Map(localWords.map(w => [w.id, w]));
+        const cloudIdMap = new Map(localWords.filter(w => w.cloudId).map(w => [w.cloudId, w]));
         
         for (const cloudWord of cloudWords) {
-            const localWord = localMap.get(cloudWord.local_id);
+            const localWord = cloudIdMap.get(cloudWord.id);
             
             if (!localWord) {
                 // Word exists in cloud but not local - add it
-                await saveWord(cloudWord.word, cloudWord.description);
+                const transaction = db.transaction([STORE_NAME], 'readwrite');
+                const store = transaction.objectStore(STORE_NAME);
+                
+                const entry = {
+                    word: cloudWord.word,
+                    description: cloudWord.description,
+                    timestamp: cloudWord.timestamp,
+                    cloudId: cloudWord.id
+                };
+                
+                store.add(entry);
             } else {
                 // Compare timestamps - keep newer version
                 if (new Date(cloudWord.timestamp) > new Date(localWord.timestamp)) {
-                    await updateWord(localWord.id, cloudWord.word, cloudWord.description);
+                    const transaction = db.transaction([STORE_NAME], 'readwrite');
+                    const store = transaction.objectStore(STORE_NAME);
+                    
+                    localWord.word = cloudWord.word;
+                    localWord.description = cloudWord.description;
+                    localWord.timestamp = cloudWord.timestamp;
+                    
+                    store.put(localWord);
                 }
             }
         }
