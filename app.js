@@ -549,6 +549,19 @@ document.getElementById('signupSubmitBtn').addEventListener('click', async funct
     }
 });
 
+// Login - Enter key support
+document.getElementById('loginEmail').addEventListener('keypress', function(e) {
+    if (e.key === 'Enter') {
+        document.getElementById('loginSubmitBtn').click();
+    }
+});
+
+document.getElementById('loginPassword').addEventListener('keypress', function(e) {
+    if (e.key === 'Enter') {
+        document.getElementById('loginSubmitBtn').click();
+    }
+});
+
 // Login
 document.getElementById('loginSubmitBtn').addEventListener('click', async function() {
     const email = document.getElementById('loginEmail').value.trim();
@@ -600,6 +613,29 @@ document.getElementById('showSignupLink').addEventListener('click', (e) => {
     
     const signupModal = new bootstrap.Modal(document.getElementById('signupModal'));
     signupModal.show();
+});
+
+// Refresh
+document.getElementById('refreshBtn').addEventListener('click', async () => {
+    const refreshBtn = document.getElementById('refreshBtn');
+    const icon = refreshBtn.querySelector('i');
+    
+    try {
+        // Add spinning animation
+        icon.classList.add('fa-spin');
+        refreshBtn.disabled = true;
+        
+        // Fetch and render latest words
+        await renderWordsList();
+        
+        showToast('Words refreshed successfully!');
+    } catch (error) {
+        showToast('Refresh failed: ' + error.message);
+    } finally {
+        // Remove spinning animation
+        icon.classList.remove('fa-spin');
+        refreshBtn.disabled = false;
+    }
 });
 
 // Logout

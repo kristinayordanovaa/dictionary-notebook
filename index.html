@@ -14,9 +14,10 @@
     <!-- PWA Manifest -->
     <link rel="manifest" href="manifest.json">
     <link rel="icon" type="image/x-icon" href="favicon.ico">
+    <link rel="icon" type="image/svg+xml" href="favicon.svg">
     
     <!-- Icons -->
-    <link rel="apple-touch-icon" href="icon-192.png">
+    <link rel="apple-touch-icon" href="apple-touch-icon.png">
     
     <!-- Supabase JS Client -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -30,28 +31,25 @@
     <nav class="navbar navbar-dark bg-primary">
         <div class="container-fluid">
             <span class="navbar-brand mb-0 h1">
-                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle; margin-right: 8px;">
-                    <path d="M13.4 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7.4"/>
-                    <path d="M2 6h4"/>
-                    <path d="M2 10h4"/>
-                    <path d="M2 14h4"/>
-                    <path d="M2 18h4"/>
-                    <path d="M21.378 5.626a1 1 0 1 0-3.004-3.004l-5.01 5.012a2 2 0 0 0-.506.854l-.837 2.87a.5.5 0 0 0 .62.62l2.87-.837a2 2 0 0 0 .854-.506z"/>
-                </svg>
-                My Dictionary
+                <img src="web-app-manifest-192x192.png" alt="Dictionary Icon" style="width: 32px; height: 32px; vertical-align: middle; margin-right: 8px; border-radius: 50%;">
+                <span style="color: #000000;">My Dictionary</span>
             </span>
             <div class="d-flex gap-2 align-items-center">
                 <!-- User Info (shown when logged in) -->
-                <span id="userInfo" class="text-white small">
-                    <i class="bi bi-person-circle"></i> <span id="userEmail"></span>
+                <span id="userInfo" class="small user-email-container" style="color: #000000;">
+                    <i class="bi bi-person-circle"></i> <span id="userEmail" class="user-email-text"></span>
                 </span>
+                <!-- Refresh Button -->
+                <button class="btn btn-outline-light btn-sm nav-btn" id="refreshBtn" title="Refresh words">
+                    <i class="bi bi-arrow-clockwise"></i>
+                </button>
                 <!-- Add Word Button -->
-                <button class="btn btn-light btn-sm" id="addWordBtn">
-                    <i class="bi bi-plus-lg"></i> Add Word
+                <button class="btn btn-light btn-sm nav-btn" id="addWordBtn">
+                    <i class="bi bi-plus-lg"></i>
                 </button>
                 <!-- Logout Button -->
-                <button class="btn btn-outline-light btn-sm" id="logoutBtn">
-                    <i class="bi bi-box-arrow-right"></i> Logout
+                <button class="btn btn-outline-light btn-sm nav-btn" id="logoutBtn">
+                    <i class="bi bi-box-arrow-right"></i>
                 </button>
                 <!-- Install Button -->
                 <button class="btn btn-outline-light btn-sm" id="installBtn" style="display: none;">
@@ -66,16 +64,8 @@
         <div class="row justify-content-center align-items-center" style="min-height: 80vh;">
             <div class="col-md-6 col-lg-5">
                 <div class="text-center mb-5">
+                    <img src="web-app-manifest-192x192.png" alt="Dictionary Icon" style="width: 96px; height: 96px; margin-bottom: 1rem; border-radius: 50%;">
                     <h1 class="display-4 mb-3">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle;">
-                            <path d="M13.4 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7.4"/>
-                            <path d="M2 6h4"/>
-                            <path d="M2 10h4"/>
-                            <path d="M2 14h4"/>
-                            <path d="M2 18h4"/>
-                            <path d="M21.378 5.626a1 1 0 1 0-3.004-3.004l-5.01 5.012a2 2 0 0 0-.506.854l-.837 2.87a.5.5 0 0 0 .62.62l2.87-.837a2 2 0 0 0 .854-.506z"/>
-                        </svg>
-                        <br>
                         My Dictionary
                     </h1>
                     <p class="lead text-muted">Build and sync your personal vocabulary across all devices</p>

@@ -7,13 +7,15 @@ A cloud-based Progressive Web App for managing your personal dictionary with rea
 - ✅ **User Authentication**: Required - Sign up and login to use the app
 - ✅ **Cloud Storage**: All data stored securely in Supabase cloud database
 - ✅ **Real-Time Sync**: Instant synchronization across all your devices
+- ✅ **Manual Refresh**: Refresh button to sync words on demand
 - ✅ **Multi-Device Support**: Access your dictionary from anywhere
-- ✅ **PWA**: Installable on iOS and Android
+- ✅ **PWA**: Installable on iOS and Android with custom icon
 - ✅ **Search**: Filter your saved words
 - ✅ **CRUD operations**: Create, read, update, delete words
 - ✅ **Duplicate Detection**: Smart detection of similar words
 - ✅ **Responsive**: Works on mobile and desktop
 - ✅ **Bootstrap 5**: Modern, clean UI
+- ✅ **Persistent Login**: Stay logged in across sessions until manual logout
 
 ## How It Works
 
@@ -44,16 +46,19 @@ A cloud-based Progressive Web App for managing your personal dictionary with rea
 
 ```
 Dictionary-notebook/
-├── index.html          # Main HTML file
-├── styles.css          # Custom styles
-├── app.js              # Application logic
-├── config.js           # Supabase configuration
-├── manifest.json       # PWA manifest
-├── service-worker.js   # Service worker for offline
-├── netlify.toml        # Netlify configuration
-├── icon-192.png        # App icon (192x192)
-├── icon-512.png        # App icon (512x512)
-└── README.md           # This file
+├── index.html                      # Main HTML file
+├── styles.css                      # Custom styles
+├── app.js                          # Application logic
+├── config.js                       # Supabase configuration
+├── manifest.json                   # PWA manifest
+├── service-worker.js               # Service worker for offline
+├── netlify.toml                    # Netlify configuration
+├── web-app-manifest-192x192.png    # App icon (192x192)
+├── web-app-manifest-512x512.png    # App icon (512x512)
+├── apple-touch-icon.png            # iOS app icon
+├── favicon.ico                     # Browser favicon
+├── favicon.svg                     # SVG favicon
+└── README.md                       # This file
 ```
 
 ## Technology Stack
